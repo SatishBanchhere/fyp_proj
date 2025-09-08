@@ -1,22 +1,79 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar, ComposedChart } from 'recharts'
+import React, { useState, useEffect, useMemo, ChangeEvent } from 'react'
+import {
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  ComposedChart,
+  TooltipProps
+} from 'recharts'
 
-const SmartChargingDashboard = () => {
-  // State management
-  const [chargerType, setChargerType] = useState('Level 2')
-  const [batteryCapacity, setBatteryCapacity] = useState(75)
-  const [currentCharge, setCurrentCharge] = useState(20)
-  const [targetCharge, setTargetCharge] = useState(80)
-  const [earliestStart, setEarliestStart] = useState('06:00')
-  const [latestEnd, setLatestEnd] = useState('22:00')
-  const [v2gEnabled, setV2gEnabled] = useState(true)
-  const [priceThreshold, setPriceThreshold] = useState(0.25)
-  const [simulationSpeed, setSimulationSpeed] = useState(1)
+// Type definitions
+interface HourlyData {
+  hour: number
+  time: string
+  price: number
+  demand: number
+  v2gRate: number
+  gridLoad: number
+  renewable: number
+  carbonIntensity: number
+  savings: number
+}
+
+interface ChargerSpec {
+  power: number
+  efficiency: number
+  cost: number
+  color: string
+  bgColor: string
+}
+
+interface OptimalSchedule {
+  startTime: string
+  endTime: string
+  duration: number
+  totalCost: string
+  avgRate: string
+  energyAdded: string
+  carbonSaved: string
+  optimalHours: HourlyData[]
+}
+
+interface V2GOpportunity {
+  time: string
+  sellRate: number
+  buyRate: number
+  profit: string
+  potential: string
+  duration: string
+}
+
+type ChargerType = 'Level 1' | 'Level 2' | 'DC Fast' | 'Tesla Supercharger'
+
+const SmartChargingDashboard: React.FC = () => {
+  // State management with proper typing
+  const [chargerType, setChargerType] = useState<ChargerType>('Level 2')
+  const [batteryCapacity, setBatteryCapacity] = useState<number>(75)
+  const [currentCharge, setCurrentCharge] = useState<number>(20)
+  const [targetCharge, setTargetCharge] = useState<number>(80)
+  const [earliestStart, setEarliestStart] = useState<string>('06:00')
+  const [latestEnd, setLatestEnd] = useState<string>('22:00')
+  const [v2gEnabled, setV2gEnabled] = useState<boolean>(true)
+  const [priceThreshold, setPriceThreshold] = useState<number>(0.25)
+  const [simulationSpeed, setSimulationSpeed] = useState<number>(1)
 
   // Enhanced charger specifications with colors
-  const chargerSpecs = {
+  const chargerSpecs: Record<ChargerType, ChargerSpec> = {
     'Level 1': { power: 1.4, efficiency: 0.85, cost: 0.1, color: '#10B981', bgColor: 'bg-emerald-50' },
     'Level 2': { power: 7.2, efficiency: 0.90, cost: 0.15, color: '#3B82F6', bgColor: 'bg-blue-50' },
     'DC Fast': { power: 50, efficiency: 0.95, cost: 0.35, color: '#F59E0B', bgColor: 'bg-amber-50' },
@@ -24,9 +81,9 @@ const SmartChargingDashboard = () => {
   }
 
   // Generate realistic hourly data that responds to inputs
-  const generateHourlyData = () => {
+  const generateHourlyData = (): HourlyData[] => {
     const basePrice = 0.08 + (simulationSpeed * 0.02)
-    const data = []
+    const data: HourlyData[] = []
 
     for (let hour = 0; hour < 24; hour++) {
       // Enhanced demand simulation based on user inputs
@@ -76,7 +133,7 @@ const SmartChargingDashboard = () => {
     return data
   }
 
-  const [hourlyData, setHourlyData] = useState(() => generateHourlyData())
+  const [hourlyData, setHourlyData] = useState<HourlyData[]>(() => generateHourlyData())
 
   // Regenerate data when inputs change
   useEffect(() => {
@@ -92,7 +149,7 @@ const SmartChargingDashboard = () => {
   }, [simulationSpeed, chargerType, batteryCapacity, earliestStart, latestEnd, v2gEnabled, priceThreshold])
 
   // Enhanced optimal charging calculation
-  const calculateOptimalSchedule = useMemo(() => {
+  const calculateOptimalSchedule = useMemo((): OptimalSchedule => {
     const startHour = parseInt(earliestStart.split(':')[0])
     const endHour = parseInt(latestEnd.split(':')[0])
     const chargerPower = chargerSpecs[chargerType].power
@@ -109,7 +166,7 @@ const SmartChargingDashboard = () => {
         totalCost: '0.00',
         avgRate: '0.000',
         energyAdded: '0.0',
-        carbonSaved: 0,
+        carbonSaved: '0',
         optimalHours: []
       }
     }
@@ -121,7 +178,7 @@ const SmartChargingDashboard = () => {
 
     let bestStart = startHour
     let lowestScore = Infinity
-    let bestHours = []
+    let bestHours: HourlyData[] = []
 
     for (let i = 0; i <= availableHours.length - chargingHoursRequired; i++) {
       const hours = availableHours.slice(i, i + chargingHoursRequired)
@@ -156,7 +213,7 @@ const SmartChargingDashboard = () => {
   }, [hourlyData, chargerType, batteryCapacity, currentCharge, targetCharge, earliestStart, latestEnd])
 
   // Enhanced V2G opportunities
-  const v2gOpportunities = useMemo(() => {
+  const v2gOpportunities = useMemo((): V2GOpportunity[] => {
     if (!v2gEnabled) return []
 
     return hourlyData
@@ -174,11 +231,68 @@ const SmartChargingDashboard = () => {
   }, [hourlyData, priceThreshold, v2gEnabled, batteryCapacity, currentCharge])
 
   // Color theme based on current charge level
-  const getChargeColor = (percentage) => {
+  const getChargeColor = (percentage: number): string => {
     if (percentage < 20) return 'from-red-500 to-red-600'
     if (percentage < 50) return 'from-yellow-400 to-orange-500'
     if (percentage < 80) return 'from-blue-400 to-blue-600'
     return 'from-green-400 to-green-600'
+  }
+
+  // Event handlers with proper typing
+  const handleChargerTypeChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setChargerType(e.target.value as ChargerType)
+  }
+
+  const handleBatteryCapacityChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setBatteryCapacity(Number(e.target.value))
+  }
+
+  const handleCurrentChargeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setCurrentCharge(Number(e.target.value))
+  }
+
+  const handleTargetChargeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setTargetCharge(Number(e.target.value))
+  }
+
+  const handleEarliestStartChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setEarliestStart(e.target.value)
+  }
+
+  const handleLatestEndChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setLatestEnd(e.target.value)
+  }
+
+  const handleV2gEnabledChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setV2gEnabled(e.target.checked)
+  }
+
+  const handlePriceThresholdChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setPriceThreshold(Number(e.target.value))
+  }
+
+  const handleSimulationSpeedChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setSimulationSpeed(Number(e.target.value))
+  }
+
+  // Custom Tooltip component with proper typing
+  // @ts-ignore
+  const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+          <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border">
+            <p className="font-semibold">{`Time: ${label}`}</p>
+            {payload.map(
+                // @ts-ignore
+                (entry, index) => (
+                <p key={index} style={{ color: entry.color }}>
+                  {`${entry.name}: ${entry.name?.includes('Price') || entry.name?.includes('V2G') ? '$' : ''}${entry.value}${entry.name?.includes('Price') || entry.name?.includes('V2G') ? '' : '%'}`}
+                </p>
+            ))}
+          </div>
+      )
+    }
+    return null
   }
 
   return (
@@ -215,7 +329,7 @@ const SmartChargingDashboard = () => {
                     max="3"
                     step="0.5"
                     value={simulationSpeed}
-                    onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                    onChange={handleSimulationSpeedChange}
                     className="w-20"
                 />
                 <span className="text-sm font-semibold text-blue-600">{simulationSpeed}x</span>
@@ -228,7 +342,7 @@ const SmartChargingDashboard = () => {
                 <label className="block text-sm font-semibold text-black mb-2">⚡ Charger Type</label>
                 <select
                     value={chargerType}
-                    onChange={(e) => setChargerType(e.target.value)}
+                    onChange={handleChargerTypeChange}
                     className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white/80 text-black"
                 >
                   {Object.keys(chargerSpecs).map(type => (
@@ -247,7 +361,7 @@ const SmartChargingDashboard = () => {
                 <input
                     type="number"
                     value={batteryCapacity}
-                    onChange={(e) => setBatteryCapacity(Number(e.target.value))}
+                    onChange={handleBatteryCapacityChange}
                     className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white/80 text-black"
                     min="20"
                     max="200"
@@ -264,7 +378,7 @@ const SmartChargingDashboard = () => {
                 <input
                     type="range"
                     value={currentCharge}
-                    onChange={(e) => setCurrentCharge(Number(e.target.value))}
+                    onChange={handleCurrentChargeChange}
                     className="w-full mb-2"
                     min="10"
                     max="100"
@@ -288,7 +402,7 @@ const SmartChargingDashboard = () => {
                 <input
                     type="range"
                     value={targetCharge}
-                    onChange={(e) => setTargetCharge(Number(e.target.value))}
+                    onChange={handleTargetChargeChange}
                     className="w-full mb-2"
                     min="20"
                     max="100"
@@ -310,7 +424,7 @@ const SmartChargingDashboard = () => {
                     <input
                         type="time"
                         value={earliestStart}
-                        onChange={(e) => setEarliestStart(e.target.value)}
+                        onChange={handleEarliestStartChange}
                         className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white/80 text-black"
                     />
                   </div>
@@ -319,7 +433,7 @@ const SmartChargingDashboard = () => {
                     <input
                         type="time"
                         value={latestEnd}
-                        onChange={(e) => setLatestEnd(e.target.value)}
+                        onChange={handleLatestEndChange}
                         className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white/80 text-black"
                     />
                   </div>
@@ -334,7 +448,7 @@ const SmartChargingDashboard = () => {
                   <input
                       type="checkbox"
                       checked={v2gEnabled}
-                      onChange={(e) => setV2gEnabled(e.target.checked)}
+                      onChange={handleV2gEnabledChange}
                       className="w-5 h-5 mr-3 rounded focus:ring-2 focus:ring-blue-500"
                   />
                   <div>
@@ -351,7 +465,7 @@ const SmartChargingDashboard = () => {
                           max="0.50"
                           step="0.01"
                           value={priceThreshold}
-                          onChange={(e) => setPriceThreshold(Number(e.target.value))}
+                          onChange={handlePriceThresholdChange}
                           className="w-20"
                       />
                       <span className="text-sm font-semibold text-cyan-600">${priceThreshold}</span>
@@ -382,13 +496,13 @@ const SmartChargingDashboard = () => {
                     <h3 className="font-semibold mb-2">💰 Total Cost</h3>
                     <p className="text-xl sm:text-2xl font-bold">${calculateOptimalSchedule.totalCost}</p>
                     <p className="text-sm opacity-90">Avg: ${calculateOptimalSchedule.avgRate}/kWh</p>
-                    <p className="text-xs mt-1">vs ${(calculateOptimalSchedule.totalCost * 1.3).toFixed(2)} peak</p>
+                    <p className="text-xs mt-1">vs ${(parseFloat(calculateOptimalSchedule.totalCost) * 1.3).toFixed(2)} peak</p>
                   </div>
                   <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                     <h3 className="font-semibold mb-2">⚡ Energy Added</h3>
                     <p className="text-xl sm:text-2xl font-bold">{calculateOptimalSchedule.energyAdded}</p>
                     <p className="text-sm opacity-90">kWh via {chargerType}</p>
-                    <p className="text-xs mt-1">~{(calculateOptimalSchedule.energyAdded * 3.5).toFixed(0)} miles</p>
+                    <p className="text-xs mt-1">~{(parseFloat(calculateOptimalSchedule.energyAdded) * 3.5).toFixed(0)} miles</p>
                   </div>
                   <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                     <h3 className="font-semibold mb-2">🌱 Carbon Impact</h3>
@@ -436,18 +550,7 @@ const SmartChargingDashboard = () => {
                       fontSize={12}
                       tick={{ fill: '#6b7280' }}
                   />
-                  <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#f8fafc',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                      }}
-                      formatter={(value, name) => [
-                        name.includes('Price') || name.includes('V2G') ? `$${value}` : `${value}%`,
-                        name
-                      ]}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Line
                       yAxisId="price"
@@ -498,15 +601,7 @@ const SmartChargingDashboard = () => {
                       fontSize={12}
                       tick={{ fill: '#6b7280' }}
                   />
-                  <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#f8fafc',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                      }}
-                      formatter={(value, name) => [`${value.toFixed(1)}%`, name]}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Area
                       type="monotone"
@@ -545,15 +640,7 @@ const SmartChargingDashboard = () => {
                       fontSize={12}
                       tick={{ fill: '#6b7280' }}
                   />
-                  <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#f8fafc',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                      }}
-                      formatter={(value) => [`${value} lbs CO₂/MWh`, 'Carbon Intensity']}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Bar
                       dataKey="carbonIntensity"
                       fill="#8b5cf6"
@@ -684,13 +771,13 @@ const SmartChargingDashboard = () => {
               <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:scale-105 transition-transform">
                 <h4 className="text-sm font-medium text-gray-600 mb-1">Current Price</h4>
                 <p className="text-2xl sm:text-3xl font-bold text-blue-600">
-                  ${hourlyData[new Date().getHours()]?.price.toFixed(3)}
+                  ${hourlyData[new Date().getHours()]?.price.toFixed(3) || '0.000'}
                 </p>
                 <p className="text-xs text-gray-500">/kWh</p>
                 <div className="mt-2 text-xs">
-                  {hourlyData[new Date().getHours()]?.price < 0.15 ? (
+                  {(hourlyData[new Date().getHours()]?.price || 0) < 0.15 ? (
                       <span className="px-2 py-1 bg-green-200 text-green-800 rounded-full">💚 Low</span>
-                  ) : hourlyData[new Date().getHours()]?.price > 0.25 ? (
+                  ) : (hourlyData[new Date().getHours()]?.price || 0) > 0.25 ? (
                       <span className="px-2 py-1 bg-red-200 text-red-800 rounded-full">🔴 High</span>
                   ) : (
                       <span className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full">🟡 Medium</span>
@@ -701,12 +788,12 @@ const SmartChargingDashboard = () => {
               <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl hover:scale-105 transition-transform">
                 <h4 className="text-sm font-medium text-gray-600 mb-1">Grid Load</h4>
                 <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                  {hourlyData[new Date().getHours()]?.gridLoad.toFixed(0)}%
+                  {hourlyData[new Date().getHours()]?.gridLoad.toFixed(0) || '0'}%
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                   <div
                       className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${hourlyData[new Date().getHours()]?.gridLoad}%` }}
+                      style={{ width: `${hourlyData[new Date().getHours()]?.gridLoad || 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -714,11 +801,11 @@ const SmartChargingDashboard = () => {
               <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl hover:scale-105 transition-transform">
                 <h4 className="text-sm font-medium text-gray-600 mb-1">Renewable Mix</h4>
                 <p className="text-2xl sm:text-3xl font-bold text-yellow-600">
-                  {hourlyData[new Date().getHours()]?.renewable.toFixed(0)}%
+                  {hourlyData[new Date().getHours()]?.renewable.toFixed(0) || '0'}%
                 </p>
                 <div className="mt-2 text-xs">
-                  🌱 {hourlyData[new Date().getHours()]?.renewable > 70 ? 'Excellent' :
-                    hourlyData[new Date().getHours()]?.renewable > 50 ? 'Good' : 'Limited'}
+                  🌱 {(hourlyData[new Date().getHours()]?.renewable || 0) > 70 ? 'Excellent' :
+                    (hourlyData[new Date().getHours()]?.renewable || 0) > 50 ? 'Good' : 'Limited'}
                 </div>
               </div>
 
@@ -728,8 +815,8 @@ const SmartChargingDashboard = () => {
                 </h4>
                 <p className="text-2xl sm:text-3xl font-bold text-purple-600">
                   {v2gEnabled
-                      ? `$${hourlyData[new Date().getHours()]?.v2gRate.toFixed(3)}`
-                      : `${hourlyData[new Date().getHours()]?.carbonIntensity}`
+                      ? `$${hourlyData[new Date().getHours()]?.v2gRate.toFixed(3) || '0.000'}`
+                      : `${hourlyData[new Date().getHours()]?.carbonIntensity || '0'}`
                   }
                 </p>
                 <p className="text-xs text-gray-500">
